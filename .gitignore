@@ -1,0 +1,6 @@
+pkg/**
+src/**
+vGPU-Unlock-patcher/**
+*.pkg.tar.zst
+NVIDIA-Linux-*.run
+.vscode/
