@@ -2,19 +2,20 @@
 
 # Based on both the official Arch nvidia packages and the nvidia-merged AUR packages
 
+_series=525.60
 pkgbase='nvidia-merged-unlocked'
 pkgname=('lib32-nvidia-merged-unlocked-utils' 'lib32-opencl-nvidia-merged-unlocked' 'nvidia-merged-unlocked-dkms' 'nvidia-merged-unlocked-settings' 'nvidia-merged-unlocked-utils' 'opencl-nvidia-merged-unlocked')
-pkgver=510.85.02
+pkgver=${_series}.11
 pkgrel=1
 arch=('x86_64')
-makedepends=('git' 'rust')
+makedepends=('git')
 url='https://github.com/VGPU-Community-Drivers/vGPU-Unlock-patcher'
 license=('custom')
 options=('!strip')
 groups=('nvidia-merged-unlocked')
 conflicts=('nvidia-merged')
 
-_vgpupkgver=510.85.03
+_vgpupkgver=${_series}.12
 _basepkg="NVIDIA-Linux-${CARCH}-${pkgver}"
 _vgpupkg="NVIDIA-Linux-${CARCH}-${_vgpupkgver}-vgpu-kvm"
 _mergedpkg="${_basepkg}-merged-vgpu-kvm"
@@ -25,20 +26,16 @@ source=(
     "nvidia-drm-outputclass.conf"
     "nvidia-utils.sysusers"
     "nvidia.rules"
-    #"1070.patch"
-    "nvidia-510.73.05-vgpu-5.18.patch"
     "https://us.download.nvidia.com/XFree86/Linux-x86_64/${pkgver}/${_basepkg}.run"
-    "https://github.com/VGPU-Community-Drivers/NV-VGPU-Driver/releases/download/1.0.2/${_vgpupkg}.run"
-    'git+https://github.com/VGPU-Community-Drivers/vGPU-Unlock-patcher')
+    "https://downtown.wetdry.world/nvidia/${_vgpupkg}.run"
+    "git+https://github.com/VGPU-Community-Drivers/vGPU-Unlock-patcher#branch=${_series}")
 sha256sums=(
             '5ea0d9edfcf282cea9b204291716a9a4d6d522ba3a6bc28d78edf505b6dc7949'
             'be99ff3def641bb900c2486cce96530394c5dc60548fc4642f19d3a4c784134d'
             'b9c775b87829698cee92cd8b0004bd3d34b8b5cb36cef4d96199539fa72f8d15'
             'ae08ef9a33d3bb4218c0165cecc9b8a7cab03bfd749cdbd0d245cfc274852c4b'
-            #'4813d9dc351aea6a20f2c8911c40c0bf0360e2f9a484934f965d40af40cf38c1'
-            '79b09682f9c3cfa32d219a14b3c956d8f05340addd5a43e7063c3d96175a56f4'
-            '372427e633f32cff6dd76020e8ed471ef825d38878bd9655308b6efea1051090'
-            '773d3a215cedf5349eff00a9b052bc961f51ce971933f154f2d2997ed68aa59a'
+            '816ee6c2e0813ccc3d4a7958f71fc49a37c60efe1d51d6146c1ce72403983d5d'
+            'fbc7d1b567c05881433139fd3458f82c3c11c9161b3193cc8d0366dcc3b67cf6'
             'SKIP')
 
 create_links() {
@@ -92,10 +89,6 @@ DEST_MODULE_LOCATION[5]="/kernel/drivers/video"' \
       -e 's/NV_EXCLUDE_BUILD_MODULES/IGNORE_PREEMPT_RT_PRESENCE=1 NV_EXCLUDE_BUILD_MODULES/' \
       -i kernel/dkms.conf
 
-    pushd "${srcdir}/${_patchedpkg}"
-    patch -p1 < "${srcdir}/nvidia-510.73.05-vgpu-5.18.patch"
-    popd
-
     # Gift for linux-rt guys
     sed -i 's/NV_EXCLUDE_BUILD_MODULES/IGNORE_PREEMPT_RT_PRESENCE=1 NV_EXCLUDE_BUILD_MODULES/' kernel/dkms.conf
 }
@@ -111,7 +104,6 @@ package_opencl-nvidia-merged-unlocked() {
 
     # OpenCL
     install -D -m644 "${_patchedpkg}/nvidia.icd" "${pkgdir}/etc/OpenCL/vendors/nvidia.icd"
-    install -D -m755 "${_patchedpkg}/libnvidia-compiler-next.so.${pkgver}" "${pkgdir}/usr/lib/libnvidia-compiler-next.so.${pkgver}"
     install -D -m755 "${_patchedpkg}/libnvidia-compiler.so.${pkgver}" "${pkgdir}/usr/lib/libnvidia-compiler.so.${pkgver}"
     install -D -m755 "${_patchedpkg}/libnvidia-opencl.so.${pkgver}" "${pkgdir}/usr/lib/libnvidia-opencl.so.${pkgver}"
 
@@ -124,15 +116,12 @@ package_nvidia-merged-unlocked-dkms() {
     pkgdesc="NVIDIA drivers - module sources; patched for vGPU support w/ unlock & host DRM output"
     depends=('dkms' "nvidia-merged-unlocked-utils=${pkgver}" 'libglvnd')
     provides=('NVIDIA-MODULE' 'nvidia-dkms')
-    conflicts=('nvidia-dkms' 'nvidia-merged-dkms')
+    conflicts=('NVIDIA-MODULE' 'nvidia-dkms' 'nvidia-merged-dkms')
 
     cd "${srcdir}"
 
     install -d -m755 "${pkgdir}/usr/src"
     cp -dr --no-preserve='ownership' "${_patchedpkg}/kernel" "${pkgdir}/usr/src/nvidia-${pkgver}"
-
-    echo "blacklist nouveau" | install -D -m644 /dev/stdin "${pkgdir}/usr/lib/modprobe.d/${pkgname}.conf"
-    echo "nvidia-uvm"        | install -D -m644 /dev/stdin "${pkgdir}/usr/lib/modules-load.d/${pkgname}.conf"
 
     install -D -m644 "${_patchedpkg}/LICENSE" "${pkgdir}/usr/share/licenses/$pkgname/LICENSE"
 }
@@ -179,7 +168,8 @@ package_nvidia-merged-unlocked-utils() {
     ln -sr "${pkgdir}/usr/lib/libnvidia-allocator.so.${pkgver}" "${pkgdir}/usr/lib/gbm/nvidia-drm_gbm.so"
 
     # firmware
-    install -Dm644 firmware/gsp.bin "${pkgdir}/usr/lib/firmware/nvidia/${pkgver}/gsp.bin"
+    ls -lha firmware
+    install -Dm644 -t "${pkgdir}/usr/lib/firmware/nvidia/${pkgver}/" firmware/*.bin
 
     # GLX extension module for X
     install -Dm755 "libglxserver_nvidia.so.${pkgver}" "${pkgdir}/usr/lib/nvidia/xorg/libglxserver_nvidia.so.${pkgver}"
@@ -226,6 +216,9 @@ package_nvidia-merged-unlocked-utils() {
     install -Dm755 "libcuda.so.${pkgver}" "${pkgdir}/usr/lib/libcuda.so.${pkgver}"
     install -Dm755 "libnvcuvid.so.${pkgver}" "${pkgdir}/usr/lib/libnvcuvid.so.${pkgver}"
 
+    # NVVM Compiler library loaded by the CUDA driver to do JIT link-time-optimization
+    install -Dm644 "libnvidia-nvvm.so.${pkgver}" "${pkgdir}/usr/lib/libnvidia-nvvm.so.${pkgver}"
+
     # PTX JIT Compiler (Parallel Thread Execution (PTX) is a pseudo-assembly language for CUDA)
     install -Dm755 "libnvidia-ptxjitcompiler.so.${pkgver}" "${pkgdir}/usr/lib/libnvidia-ptxjitcompiler.so.${pkgver}"
 
@@ -259,7 +252,6 @@ package_nvidia-merged-unlocked-utils() {
     # nvidia-smi
     install -Dm755 nvidia-smi "${pkgdir}/usr/bin/nvidia-smi"
     install -Dm644 nvidia-smi.1.gz "${pkgdir}/usr/share/man/man1/nvidia-smi.1.gz"
-    #install -D -m755 "${srcdir}/nvidia-smi" "${pkgdir}/usr/bin/nvidia-smi"
 
     # nvidia-vgpu
     install -D -m755 nvidia-vgpud "${pkgdir}/usr/bin/nvidia-vgpud"
@@ -301,6 +293,9 @@ package_nvidia-merged-unlocked-utils() {
     install -Dm644 "${srcdir}/nvidia-utils.sysusers" "${pkgdir}/usr/lib/sysusers.d/$pkgname.conf"
 
     install -Dm644 "${srcdir}/nvidia.rules" "$pkgdir"/usr/lib/udev/rules.d/60-nvidia.rules
+
+    echo "blacklist nouveau" | install -D -m644 /dev/stdin "${pkgdir}/usr/lib/modprobe.d/${pkgname}.conf"
+    echo "nvidia-uvm"        | install -D -m644 /dev/stdin "${pkgdir}/usr/lib/modules-load.d/${pkgname}.conf"
 
     create_links
 }
